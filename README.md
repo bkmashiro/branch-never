@@ -1,3 +1,5 @@
+[![npm](https://img.shields.io/npm/v/branch-never)](https://www.npmjs.com/package/branch-never) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # branch-never
 
 `branch-never` is a static-analysis CLI for TypeScript and JavaScript projects. It scans source files for high-value conditional branches and flags the ones whose key tokens never appear in any test file.
