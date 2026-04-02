@@ -1,0 +1,52 @@
+{
+  "covered": [
+    {
+      "file": "src/extractor.ts",
+      "line": 152,
+      "conditionText": "if (kind === \"short-circuit\" && /(process\\.env\\.|NODE_ENV|config\\.|cfg\\.)/i.test(conditionText)) {",
+      "pattern": "env",
+      "kind": "short-circuit",
+      "covered": true,
+      "matchedTokens": [
+        "kind",
+        "test",
+        "conditionText",
+        "NODE_ENV",
+        "short",
+        "circuit",
+        "cfg",
+        "config"
+      ],
+      "matchedTestFiles": [
+        "test/pr-check.test.ts",
+        "test/matcher.test.ts",
+        "test/matcher-more.test.ts",
+        "test/html-report.test.ts",
+        "test/extractor.test.ts",
+        "test/extractor-more.test.ts",
+        "test/blame.test.ts",
+        "test/baseline.test.ts",
+        "test/fixtures/test/api.test.ts",
+        "test/fixtures/src/api.ts"
+      ],
+      "tokens": [
+        "short-circuit",
+        "kind",
+        "short",
+        "circuit",
+        "NODE_ENV",
+        "config",
+        "cfg",
+        "test",
+        "conditionText"
+      ]
+    }
+  ],
+  "uncovered": [],
+  "summary": {
+    "coveredCount": 1,
+    "uncoveredCount": 0,
+    "total": 1,
+    "coveragePercent": 100
+  }
+}

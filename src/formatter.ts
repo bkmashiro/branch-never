@@ -1,3 +1,4 @@
+import type { BlamedBranch } from "./blame.js";
 import chalk from "chalk";
 import type { BranchCoverage } from "./matcher.js";
 import type { CoverageSummary } from "./scorer.js";
@@ -52,6 +53,34 @@ export function formatText(payload: FormatPayload): string {
 
 export function formatJson(payload: unknown): string {
   return JSON.stringify(payload, null, 2);
+}
+
+export function formatBlameText(branches: BlamedBranch[]): string {
+  const lines: string[] = [];
+
+  lines.push(chalk.bold("Unreachable branches with blame:"));
+  lines.push("");
+
+  if (branches.length === 0) {
+    lines.push(`  ${chalk.green("None")}`);
+    return lines.join("\n");
+  }
+
+  for (const branch of branches) {
+    lines.push(`  ${chalk.red(`${branch.file}:${branch.line}`)}  ${branch.conditionText}`);
+    if (branch.blame) {
+      lines.push(`    \u2192 Author: ${branch.blame.authorName} <${branch.blame.authorEmail}>`);
+      lines.push(`    \u2192 Last modified: ${branch.blame.authorDate} (${branch.blame.relativeDays} days ago)`);
+      lines.push(`    \u2192 Commit: "${branch.blame.commitSummary}"`);
+    } else {
+      lines.push("    \u2192 Author: unavailable");
+      lines.push("    \u2192 Last modified: unavailable");
+      lines.push("    \u2192 Commit: unavailable");
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n").trimEnd();
 }
 
 function describeUncovered(branch: BranchCoverage): string {

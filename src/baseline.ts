@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { execFile as execFileCallback } from "node:child_process";
 import { extractBranchesFromDirectory, type PatternType } from "./extractor.js";
@@ -21,6 +22,14 @@ export interface BaselineComparison {
   newlyUncovered: BranchCoverage[];
   newlyCovered: BranchCoverage[];
   netChange: number;
+}
+
+export interface PrCheckComparison {
+  baselinePath: string;
+  baseline: FormatPayload;
+  current: FormatPayload;
+  newUnreachable: BranchCoverage[];
+  resolvedUnreachable: BranchCoverage[];
 }
 
 interface GitResult {
@@ -90,6 +99,14 @@ export async function analyzeAgainstBaseline(options: AnalysisOptions & { baseli
   return compareUncoveredBranches(options.baselineRef, baseline, current);
 }
 
+export async function analyzePrCheck(
+  options: AnalysisOptions & { baselinePath: string }
+): Promise<PrCheckComparison> {
+  const current = await analyzeBranchCoverage(options);
+  const baseline = await loadBaselinePayload(options.baselinePath);
+  return comparePrBaseline(options.baselinePath, baseline, current);
+}
+
 export function formatBaselineComparison(comparison: BaselineComparison): string {
   const lines: string[] = [];
 
@@ -119,6 +136,75 @@ export function formatBaselineComparison(comparison: BaselineComparison): string
   const direction = comparison.netChange > 0 ? "improvement" : comparison.netChange < 0 ? "regression" : "no change";
   const signed = comparison.netChange > 0 ? `+${comparison.netChange}` : `${comparison.netChange}`;
   lines.push(`Net: ${signed} branches (${direction})`);
+
+  return lines.join("\n");
+}
+
+export function comparePrBaseline(
+  baselinePath: string,
+  baseline: FormatPayload,
+  current: FormatPayload
+): PrCheckComparison {
+  const baselineKeys = new Map(baseline.uncovered.map((branch) => [branchIdentity(branch), branch]));
+  const currentKeys = new Map(current.uncovered.map((branch) => [branchIdentity(branch), branch]));
+  const newUnreachable = [...currentKeys.entries()]
+    .filter(([key]) => !baselineKeys.has(key))
+    .map(([, branch]) => branch)
+    .sort(compareBranches);
+  const resolvedUnreachable = [...baselineKeys.entries()]
+    .filter(([key]) => !currentKeys.has(key))
+    .map(([, branch]) => branch)
+    .sort(compareBranches);
+
+  return {
+    baselinePath,
+    baseline,
+    current,
+    newUnreachable,
+    resolvedUnreachable
+  };
+}
+
+export async function loadBaselinePayload(baselinePath: string): Promise<FormatPayload> {
+  const raw = await readFile(baselinePath, "utf8");
+  const parsed = JSON.parse(raw) as unknown;
+
+  if (isFormatPayload(parsed)) {
+    return parsed;
+  }
+
+  if (Array.isArray(parsed) && parsed.every(isBranchCoverage)) {
+    return {
+      covered: [],
+      uncovered: parsed,
+      summary: calculateCoverage(parsed)
+    };
+  }
+
+  throw new Error(`Invalid baseline file: ${baselinePath}`);
+}
+
+export function formatPrCheckComparison(comparison: PrCheckComparison): string {
+  const lines: string[] = [];
+
+  lines.push("Comparing against baseline...");
+  lines.push(`  Baseline: ${comparison.baseline.uncovered.length} unreachable branches`);
+  lines.push(`  Current:  ${comparison.current.uncovered.length} unreachable branches`);
+  lines.push("");
+
+  if (comparison.newUnreachable.length === 0) {
+    lines.push("No new unreachable branches introduced in this PR.");
+    lines.push("");
+    lines.push("\u2705 PR check passed");
+    return lines.join("\n");
+  }
+
+  lines.push("New unreachable branches introduced in this PR:");
+  for (const branch of comparison.newUnreachable) {
+    lines.push(`  ${branch.file}:${branch.line}  ${branch.conditionText}  \u2190 NEW`);
+  }
+  lines.push("");
+  lines.push(`\u274c PR check failed: ${comparison.newUnreachable.length} new unreachable branches`);
 
   return lines.join("\n");
 }
@@ -173,4 +259,28 @@ function compareBranches(left: BranchCoverage, right: BranchCoverage): number {
   }
 
   return left.file.localeCompare(right.file);
+}
+
+function isFormatPayload(value: unknown): value is FormatPayload {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<FormatPayload>;
+  return Array.isArray(candidate.covered) && Array.isArray(candidate.uncovered) && candidate.summary !== undefined;
+}
+
+function isBranchCoverage(value: unknown): value is BranchCoverage {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<BranchCoverage>;
+  return (
+    typeof candidate.file === "string" &&
+    typeof candidate.line === "number" &&
+    typeof candidate.conditionText === "string" &&
+    typeof candidate.pattern === "string" &&
+    typeof candidate.kind === "string"
+  );
 }

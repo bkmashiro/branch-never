@@ -33,6 +33,8 @@ Options:
   --threshold <pct> Fail if coverage below N% (default: 0, fail on any)
   --report <file>   Write an HTML report
   --baseline <ref>  Compare current uncovered branches against a git ref
+  --blame           Show git blame metadata for each unreachable branch
+  --pr-check        Compare current unreachable branches against a baseline JSON file
 ```
 
 Example output:
@@ -59,6 +61,27 @@ Baseline comparison:
 
 ```bash
 branch-never src --tests test --baseline main
+```
+
+Blame mode:
+
+```bash
+branch-never src --tests test --blame
+```
+
+PR check mode:
+
+```bash
+branch-never src --tests test --json --no-fail > .branch-never-baseline.json
+branch-never src --tests test --pr-check --baseline .branch-never-baseline.json
+```
+
+GitHub Actions:
+
+```yaml
+- run: pnpm build
+- run: pnpm test
+- run: node dist/index.js src --tests test --pr-check --baseline .branch-never-baseline.json
 ```
 
 ## What It Detects
