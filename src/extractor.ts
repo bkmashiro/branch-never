@@ -110,9 +110,10 @@ export function extractInterestingBranches(code: string, file = "<memory>"): Bra
 
 export async function extractBranchesFromDirectory(
   srcDir: string,
-  patternType: PatternType | "all" = "all"
+  patternType: PatternType | "all" = "all",
+  cwd = process.cwd()
 ): Promise<BranchMatch[]> {
-  const absoluteDir = path.resolve(srcDir);
+  const absoluteDir = path.resolve(cwd, srcDir);
   const files = await glob(FILE_GLOB, {
     absolute: true,
     cwd: absoluteDir,
@@ -123,7 +124,7 @@ export async function extractBranchesFromDirectory(
   const branches = await Promise.all(
     files.map(async (file) => {
       const code = await readFile(file, "utf8");
-      return extractInterestingBranches(code, path.relative(process.cwd(), file));
+      return extractInterestingBranches(code, path.relative(cwd, file));
     })
   );
 

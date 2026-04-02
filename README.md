@@ -31,6 +31,8 @@ Options:
   --no-fail         Don't exit 1 when uncovered branches found
   --pattern <type>  Only check: env|retry|error|feature|all (default: all)
   --threshold <pct> Fail if coverage below N% (default: 0, fail on any)
+  --report <file>   Write an HTML report
+  --baseline <ref>  Compare current uncovered branches against a git ref
 ```
 
 Example output:
@@ -45,6 +47,18 @@ Covered branches:
   src/auth.ts:15   if (!token)  <- referenced in test/auth.test.ts
 
 Summary: 1 uncovered branches, 1 covered. Coverage: 50%
+```
+
+HTML report:
+
+```bash
+branch-never src --tests test --report report.html
+```
+
+Baseline comparison:
+
+```bash
+branch-never src --tests test --baseline main
 ```
 
 ## What It Detects

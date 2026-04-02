@@ -1,9 +1,9 @@
 #!/usr/bin/env node
+import { writeFile } from "node:fs/promises";
 import { Command } from "commander";
-import { extractBranchesFromDirectory } from "./extractor.js";
-import { formatJson, formatText } from "./formatter.js";
-import { loadTestFiles, matchBranchesToTests } from "./matcher.js";
-import { calculateCoverage } from "./scorer.js";
+import { analyzeAgainstBaseline, analyzeBranchCoverage, formatBaselineComparison } from "./baseline.js";
+import { formatJson, formatText, type FormatPayload } from "./formatter.js";
+import { generateHtmlReport } from "./html-report.js";
 
 interface CliOptions {
   tests: string;
@@ -11,6 +11,8 @@ interface CliOptions {
   fail: boolean;
   pattern: "env" | "retry" | "error" | "feature" | "all";
   threshold: string;
+  report?: string;
+  baseline?: string;
 }
 
 const program = new Command();
@@ -23,6 +25,8 @@ program
   .option("--no-fail", "Don't exit 1 when uncovered branches found")
   .option("--pattern <type>", "Only check: env|retry|error|feature|all", "all")
   .option("--threshold <pct>", "Fail if coverage below N% (default: 0, fail on any)", "0")
+  .option("--report <output-file>", "Write an HTML report to a file")
+  .option("--baseline <branch>", "Compare current uncovered branches against a git ref")
   .action(async (srcDir: string, options: CliOptions) => {
     const threshold = Number(options.threshold);
     if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) {
@@ -37,21 +41,48 @@ program
       return;
     }
 
-    const branches = await extractBranchesFromDirectory(srcDir, options.pattern);
-    const testFiles = await loadTestFiles(options.tests);
-    const results = matchBranchesToTests(branches, testFiles);
-    const covered = results.filter((result) => result.covered);
-    const uncovered = results.filter((result) => !result.covered);
-    const summary = calculateCoverage(results);
-    const payload = { covered, uncovered, summary };
+    let payload: FormatPayload;
+    let comparison;
+
+    if (options.baseline) {
+      comparison = await analyzeAgainstBaseline({
+        srcDir,
+        testsDir: options.tests,
+        pattern: options.pattern,
+        baselineRef: options.baseline
+      });
+      payload = comparison.current;
+    } else {
+      payload = await analyzeBranchCoverage({
+        srcDir,
+        testsDir: options.tests,
+        pattern: options.pattern
+      });
+    }
+
+    const shouldPrintText = !options.report || Boolean(options.baseline);
 
     if (options.json) {
-      console.log(formatJson(payload));
-    } else {
+      console.log(formatJson(comparison ? { ...payload, comparison } : payload));
+    } else if (comparison && shouldPrintText) {
+      console.log(formatBaselineComparison(comparison));
+    } else if (shouldPrintText) {
       console.log(formatText(payload));
     }
 
-    const thresholdTriggered = threshold > 0 ? summary.coveragePercent < threshold : uncovered.length > 0;
+    if (options.report) {
+      const html = await generateHtmlReport(payload, { baselineComparison: comparison });
+      await writeFile(options.report, html, "utf8");
+      const target = `Generated: ${options.report}`;
+      if (options.json) {
+        console.error(target);
+      } else {
+        console.log(target);
+      }
+    }
+
+    const thresholdTriggered =
+      threshold > 0 ? payload.summary.coveragePercent < threshold : payload.uncovered.length > 0;
     if (options.fail && thresholdTriggered) {
       process.exitCode = 1;
     }

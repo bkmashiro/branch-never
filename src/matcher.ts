@@ -79,8 +79,8 @@ export function collectTestTokens(contents: string): Set<string> {
   return tokens;
 }
 
-export async function loadTestFiles(testDir: string): Promise<Map<string, TestFileRecord>> {
-  const absoluteDir = path.resolve(testDir);
+export async function loadTestFiles(testDir: string, cwd = process.cwd()): Promise<Map<string, TestFileRecord>> {
+  const absoluteDir = path.resolve(cwd, testDir);
   const files = await glob(FILE_GLOB, {
     absolute: true,
     cwd: absoluteDir,
@@ -92,7 +92,7 @@ export async function loadTestFiles(testDir: string): Promise<Map<string, TestFi
     files.map(async (file) => {
       const contents = await readFile(file, "utf8");
       return [
-        path.relative(process.cwd(), file),
+        path.relative(cwd, file),
         {
           contents,
           tokens: collectTestTokens(contents)

@@ -50,7 +50,7 @@ export function formatText(payload: FormatPayload): string {
   return lines.join("\n");
 }
 
-export function formatJson(payload: FormatPayload): string {
+export function formatJson(payload: unknown): string {
   return JSON.stringify(payload, null, 2);
 }
 
